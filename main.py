@@ -3,7 +3,7 @@ import streamlit as st
 import time
 from src import brain, memory
 from src.gui import header
-import filesystem  # <--- NEW IMPORT
+from src.tools import filesystem
 
 # 1. Load Config
 with open("config/settings.yaml", "r") as f:
@@ -68,60 +68,90 @@ if prompt := st.chat_input(f"Chat with {model_config['name']}..."):
             
             if action_line:
                 # 2. Extract the Action Name cleanly
-                # Start by taking everything after "ACTION:"
-                raw_action = action_line.split("ACTION:")[1].strip()
-            
-                # Check if "INPUT:" is accidentally on the same line
-                if "INPUT:" in raw_action:
-                    # Split it: Action is the first part, Input is the second
-                    parts = raw_action.split("INPUT:")
-                    action = parts[0].strip()
-                    input_param = parts[1].strip()
-                else:
-                    # Normal case: Action is clean, Input is on a later line
-                    action = raw_action
-                    input_param = ""
-                    for line in lines:
-                        if "INPUT:" in line and "ACTION:" not in line:
-                            input_param = line.split("INPUT:", 1)[1].strip()
-                            break
-
-                # Visual feedback
-                status_container = st.status(f"Dustin is running: {action}...", expanded=True)
-                tool_output = ""
-                
-                # --- Execute Tools ---
-                if action == "list_directory":
-                    # Default to current directory if input is empty
-                    path = input_param if input_param else "."
-                    tool_output = filesystem.list_directory(path)
+                try:
+                    raw_action = action_line.split("ACTION:")[1].strip()
                     
-                elif action == "read_file":
-                    tool_output = filesystem.read_file(input_param)
-                    
-                elif action == "create_file":
-                    # Splitting filename | content
-                    if "|" in input_param:
-                        parts = input_param.split("|", 1)
-                        fname = parts[0].strip()
-                        fcontent = parts[1].strip()
-                        tool_output = filesystem.create_file(fname, fcontent)
+                    # Check if "INPUT:" is accidentally on the same line
+                    if "INPUT:" in raw_action:
+                        parts = raw_action.split("INPUT:")
+                        action = parts[0].strip()
+                        input_param = parts[1].strip()
                     else:
-                        tool_output = f"Error: Input '{input_param}' must be format 'filename | content'"
-                
-                else:
-                    tool_output = f"Error: Unknown tool '{action}'"
+                        action = raw_action
+                        input_param = ""
+                        for line in lines:
+                            if "INPUT:" in line and "ACTION:" not in line:
+                                input_param = line.split("INPUT:", 1)[1].strip()
+                                break
+                except IndexError:
+                    action = None
+                    input_param = ""
 
-                # Display Tool Output
-                status_container.write(tool_output)
-                status_container.update(label="Task Completed", state="complete", expanded=False)
+                if action:
+                    # Visual feedback
+                    status_container = st.status(f"Dustin is running: {action}...", expanded=True)
+                    tool_output = ""
+                    
+                    # --- Execute Tools ---
+                    if action == "list_directory":
+                        path = input_param if input_param else "."
+                        tool_output = filesystem.list_directory(path)
+                        
+                    elif action == "read_file":
+                        tool_output = filesystem.read_file(input_param)
+                        
+                    elif action == "create_file":
+                        # Splitting filename | content
+                        if "|" in input_param:
+                            parts = input_param.split("|", 1)
+                            fname = parts[0].strip()
+                            fcontent = parts[1].strip()
+                            tool_output = filesystem.create_file(fname, fcontent)
+                        elif " " in input_param:
+                            parts = input_param.split(" ", 1)
+                            fname = parts[0].strip()
+                            fcontent = parts[1].strip()
+                            if "." in fname:
+                                tool_output = filesystem.create_file(fname, fcontent)
+                            else:
+                                tool_output = "Error: Could not detect filename. Format: filename | content"
+                        else:
+                            tool_output = "Error: Input format must be 'filename | content'"
+                    
+                    elif action == "overwrite_file":
+                        # Splitting filename | content
+                        if "|" in input_param:
+                            parts = input_param.split("|", 1)
+                            fname = parts[0].strip()
+                            fcontent = parts[1].strip()
+                            tool_output = filesystem.overwrite_file(fname, fcontent)
+                        elif " " in input_param:
+                            parts = input_param.split(" ", 1)
+                            fname = parts[0].strip()
+                            fcontent = parts[1].strip()
+                            if "." in fname:
+                                tool_output = filesystem.overwrite_file(fname, fcontent)
+                            else:
+                                tool_output = "Error: Could not detect filename. Format: filename | content"
+                        else:
+                            tool_output = "Error: Input format must be 'filename | content'"
+                    
+                    elif action == "run_script":
+                        tool_output = "Error: run_script not implemented"
 
-                # 3. Save Context
-                memory.add_message("assistant", full_response)
-                memory.add_message("system", f"TOOL OUTPUT: {tool_output}")
-                
-                # Force a rerun so the new context is processed immediately (optional but smoother)
-                # st.rerun() 
+                    else:
+                        tool_output = f"Error: Unknown tool '{action}'"
+
+                    # Display Tool Output
+                    status_container.write(tool_output)
+                    status_container.update(label="Task Completed", state="complete", expanded=False)
+
+                    # 3. Save Context
+                    memory.add_message("assistant", full_response)
+                    memory.add_message("system", f"TOOL OUTPUT: {tool_output}")
+                    
+                    # Force a rerun so the new context is processed immediately
+                    st.rerun() 
         
         else:
             # No tool used, just save the text
