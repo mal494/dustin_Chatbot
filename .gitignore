@@ -1,0 +1,12 @@
+# Ignore ALL .gguf files in any subfolder
+*.gguf
+*.bin
+
+# Standard ignores
+.venv/
+venv/
+.env
+
+# Ignore Python cache
+__pycache__/
+*.pyc

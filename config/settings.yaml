@@ -1,0 +1,13 @@
+app_name: "Dustin AI"
+default_model: "coder"  # Set the default choice here
+
+models:
+  coder:
+    name: "Qwen 2.5 (Coder)"
+    path: "models/Qwen2.5-Coder/Qwen2.5-coder.gguf"
+    context_size: 8192  # Qwen handles large context well
+    
+  chat:
+    name: "DarkIdol (Llama 3.1)"
+    path: "models/DarkIdol-Llama-3.1/DarkIdol-Llama-3.1.gguf"
+    context_size: 4096
